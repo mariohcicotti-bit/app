@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const AuthContext = createContext({});
@@ -16,8 +16,12 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const isFetchingProfile = useRef(false);
 
   const fetchProfile = async (userId) => {
+    if (isFetchingProfile.current) return;
+    
+    isFetchingProfile.current = true;
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -36,12 +40,12 @@ export const AuthProvider = ({ children }) => {
       setProfile(null);
     } finally {
       setLoading(false);
+      isFetchingProfile.current = false;
     }
   };
 
   useEffect(() => {
-    let isInitialLoad = true;
-
+    // Buscar sessão inicial
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user || null);
@@ -52,18 +56,16 @@ export const AuthProvider = ({ children }) => {
       }
     });
 
+    // Listener de mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (isInitialLoad) {
-        isInitialLoad = false;
-        return;
-      }
-
+      console.log('Auth event:', event);
+      
       setSession(session);
       setUser(session?.user || null);
       
-      if (session?.user) {
+      if (session?.user && event !== 'INITIAL_SESSION') {
         await fetchProfile(session.user.id);
-      } else {
+      } else if (!session) {
         setProfile(null);
         setLoading(false);
       }
@@ -75,29 +77,41 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const signUp = async (email, password) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    if (error) throw error;
-    return data;
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      throw error;
+    }
   };
 
   const signIn = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) throw error;
-    return data;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      throw error;
+    }
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    setUser(null);
-    setProfile(null);
-    setSession(null);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+    } catch (error) {
+      throw error;
+    }
   };
 
   const getTrialDaysRemaining = () => {
