@@ -1,0 +1,397 @@
+import { useState } from "react";
+import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+import { TrendingUp, TrendingDown, Calculator, Download, DollarSign, LogOut, Clock } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { PaywallModal } from "@/components/PaywallModal";
+import { useNavigate } from "react-router-dom";
+
+export default function CalculatorPage() {
+  const [productName, setProductName] = useState("");
+  const [productCost, setProductCost] = useState("");
+  const [profitMargin, setProfitMargin] = useState("");
+  const [currentTaxRate, setCurrentTaxRate] = useState("");
+  const [ivaRate, setIvaRate] = useState([26.5]);
+  const [results, setResults] = useState(null);
+  const [showPaywall, setShowPaywall] = useState(false);
+  
+  const { user, profile, signOut, getTrialDaysRemaining, canGeneratePDF } = useAuth();
+  const navigate = useNavigate();
+
+  const calculateResults = () => {
+    const cost = parseFloat(productCost);
+    const margin = parseFloat(profitMargin) / 100;
+    const currentTax = parseFloat(currentTaxRate) / 100;
+    const newTax = ivaRate[0] / 100;
+
+    if (isNaN(cost) || isNaN(margin) || isNaN(currentTax)) {
+      alert("Por favor, preencha todos os campos corretamente");
+      return;
+    }
+
+    const currentSalePrice = cost / (1 - margin - currentTax);
+    const currentProfit = currentSalePrice * margin;
+    const newProfitIfSamePrice = currentSalePrice - cost - (currentSalePrice * newTax);
+    const profitGap = currentProfit - newProfitIfSamePrice;
+    const suggestedPrice = cost / (1 - margin - newTax);
+    const profitImpact = ((profitGap / currentProfit) * 100);
+
+    setResults({
+      currentSalePrice: currentSalePrice.toFixed(2),
+      currentProfit: currentProfit.toFixed(2),
+      newProfitIfSamePrice: newProfitIfSamePrice.toFixed(2),
+      profitGap: profitGap.toFixed(2),
+      suggestedPrice: suggestedPrice.toFixed(2),
+      profitImpact: profitImpact.toFixed(1),
+      ivaRate: ivaRate[0]
+    });
+  };
+
+  const generatePDF = () => {
+    if (!canGeneratePDF()) {
+      setShowPaywall(true);
+      return;
+    }
+
+    if (!results) return;
+
+    const doc = new jsPDF();
+    
+    doc.setFillColor(0, 71, 171);
+    doc.rect(0, 0, 210, 40, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont(undefined, 'bold');
+    doc.text('SVRN Tax Simulator', 105, 20, { align: 'center' });
+    
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'normal');
+    doc.text('Relatório de Impacto - Reforma Tributária 2026', 105, 30, { align: 'center' });
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('Produto Analisado', 20, 55);
+    
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Nome: ${productName}`, 20, 65);
+    doc.text(`Custo: R$ ${parseFloat(productCost).toFixed(2)}`, 20, 72);
+    doc.text(`Margem de Lucro Atual: ${profitMargin}%`, 20, 79);
+    doc.text(`Carga Tributária Atual: ${currentTaxRate}%`, 20, 86);
+    doc.text(`Nova Alíquota IVA 2026: ${results.ivaRate}%`, 20, 93);
+    
+    doc.autoTable({
+      startY: 105,
+      head: [['Métrica', 'Valor']],
+      body: [
+        ['Preço de Venda Atual', `R$ ${results.currentSalePrice}`],
+        ['Lucro Atual', `R$ ${results.currentProfit}`],
+        ['Lucro com IVA (mesmo preço)', `R$ ${results.newProfitIfSamePrice}`],
+        ['Gap de Lucro', `R$ ${results.profitGap}`],
+        ['Impacto no Lucro', `${results.profitImpact}%`],
+        ['', ''],
+        ['PREÇO SUGERIDO SVRN', `R$ ${results.suggestedPrice}`]
+      ],
+      theme: 'striped',
+      margin: { left: 20, right: 20 },
+      headStyles: {
+        fillColor: [0, 71, 171],
+        fontSize: 12,
+        fontStyle: 'bold'
+      },
+      bodyStyles: {
+        fontSize: 11
+      },
+      columnStyles: {
+        0: { cellWidth: 110 },
+        1: { cellWidth: 60, halign: 'right', fontStyle: 'bold' }
+      },
+      didParseCell: function(data) {
+        if (data.row.index === 6 && data.section === 'body') {
+          data.cell.styles.fillColor = [212, 175, 55];
+          data.cell.styles.textColor = [0, 0, 0];
+          data.cell.styles.fontSize = 13;
+          data.cell.styles.fontStyle = 'bold';
+        }
+      }
+    });
+    
+    const pageHeight = doc.internal.pageSize.height;
+    doc.setFillColor(15, 15, 16);
+    doc.rect(0, pageHeight - 35, 210, 35, 'F');
+    
+    doc.setTextColor(212, 175, 55);
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('SVRN Tech', 105, pageHeight - 22, { align: 'center' });
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'normal');
+    doc.text('Agende sua Consultoria Tributária', 105, pageHeight - 13, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Relatório gerado em ${new Date().toLocaleDateString('pt-BR')}`, 105, pageHeight - 5, { align: 'center' });
+    
+    doc.save(`SVRN_Tax_Simulator_${productName.replace(/\s+/g, '_')}.pdf`);
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
+  };
+
+  const trialDays = getTrialDaysRemaining();
+  const isPro = profile?.is_pro_member;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+      {/* Header with Trial Badge */}
+      <div className="border-b border-slate-800 bg-slate-950/50 backdrop-blur-sm">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
+                <Calculator className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-white">SVRN Tax Simulator</h1>
+                <p className="text-sm text-slate-400">Reforma Tributária 2026</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              {/* Trial Badge */}
+              {!isPro && trialDays !== null && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 border border-blue-600/30 rounded-lg" data-testid="trial-badge">
+                  <Clock className="w-4 h-4 text-blue-400" />
+                  <span className="text-sm text-blue-300 font-medium">
+                    {trialDays > 0 ? `${trialDays} dias restantes` : 'Trial expirado'}
+                  </span>
+                </div>
+              )}
+              
+              {isPro && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-600/20 border border-yellow-600/30 rounded-lg">
+                  <span className="text-sm text-yellow-300 font-medium">PRO Member</span>
+                </div>
+              )}
+              
+              <div className="text-sm text-slate-400">{user?.email}</div>
+              
+              <Button 
+                onClick={handleSignOut}
+                variant="ghost"
+                size="sm"
+                className="text-slate-400 hover:text-white"
+                data-testid="sign-out-button"
+              >
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Input Form */}
+          <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm" data-testid="input-form-card">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-blue-500" />
+                Dados do Produto
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="product-name" className="text-slate-300">Nome do Produto</Label>
+                <Input
+                  id="product-name"
+                  data-testid="product-name-input"
+                  placeholder="Ex: Tênis Esportivo Premium"
+                  value={productName}
+                  onChange={(e) => setProductName(e.target.value)}
+                  className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="product-cost" className="text-slate-300">Custo do Produto (R$)</Label>
+                <Input
+                  id="product-cost"
+                  data-testid="product-cost-input"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={productCost}
+                  onChange={(e) => setProductCost(e.target.value)}
+                  className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="profit-margin" className="text-slate-300">Margem de Lucro Atual (%)</Label>
+                <Input
+                  id="profit-margin"
+                  data-testid="profit-margin-input"
+                  type="number"
+                  step="0.1"
+                  placeholder="0.0"
+                  value={profitMargin}
+                  onChange={(e) => setProfitMargin(e.target.value)}
+                  className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="current-tax" className="text-slate-300">Carga Tributária Atual (%)</Label>
+                <Input
+                  id="current-tax"
+                  data-testid="current-tax-input"
+                  type="number"
+                  step="0.1"
+                  placeholder="0.0"
+                  value={currentTaxRate}
+                  onChange={(e) => setCurrentTaxRate(e.target.value)}
+                  className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <Label className="text-slate-300">Alíquota IVA 2026</Label>
+                  <span className="text-2xl font-bold text-blue-400" data-testid="iva-rate-display">{ivaRate[0]}%</span>
+                </div>
+                <Slider
+                  data-testid="iva-rate-slider"
+                  value={ivaRate}
+                  onValueChange={setIvaRate}
+                  min={20}
+                  max={35}
+                  step={0.5}
+                  className="py-4"
+                />
+                <div className="flex justify-between text-xs text-slate-500">
+                  <span>20%</span>
+                  <span>35%</span>
+                </div>
+              </div>
+
+              <Button 
+                data-testid="calculate-button"
+                onClick={calculateResults}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold h-12 text-base"
+              >
+                Calcular Impacto
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Results */}
+          {results ? (
+            <div className="space-y-4" data-testid="results-section">
+              <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="text-white text-base">Cenário Atual</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Preço de Venda</span>
+                    <span className="text-xl font-bold text-white" data-testid="current-sale-price">R$ {results.currentSalePrice}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Lucro Líquido</span>
+                    <span className="text-xl font-bold text-green-400" data-testid="current-profit">R$ {results.currentProfit}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="text-white text-base flex items-center gap-2">
+                    <TrendingDown className="w-4 h-4 text-red-500" />
+                    Cenário 2026 (Mantendo Preço)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Novo Lucro</span>
+                    <span className="text-xl font-bold text-orange-400" data-testid="new-profit">R$ {results.newProfitIfSamePrice}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Gap de Lucro</span>
+                    <span className="text-xl font-bold text-red-400" data-testid="profit-gap">- R$ {results.profitGap}</span>
+                  </div>
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                    <div className="flex items-center gap-2">
+                      <TrendingDown className="w-5 h-5 text-red-400" />
+                      <div>
+                        <div className="text-xs text-slate-400">Impacto no Lucro</div>
+                        <div className="text-lg font-bold text-red-400" data-testid="profit-impact">-{results.profitImpact}%</div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-yellow-600/20 to-yellow-700/20 border-yellow-600/30 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="text-yellow-400 text-base flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4" />
+                    Recomendação SVRN
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center space-y-2">
+                    <div className="text-sm text-yellow-200">Preço Sugerido para Manter Margem</div>
+                    <div className="text-4xl font-bold text-yellow-400" data-testid="suggested-price">R$ {results.suggestedPrice}</div>
+                    <div className="text-xs text-yellow-200/70">Mantém sua margem de {profitMargin}% mesmo com IVA de {results.ivaRate}%</div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Button 
+                data-testid="download-pdf-button"
+                onClick={generatePDF}
+                className="w-full bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-semibold h-12 text-base"
+              >
+                <Download className="w-5 h-5 mr-2" />
+                Baixar Relatório PDF
+              </Button>
+            </div>
+          ) : (
+            <Card className="bg-slate-900/30 border-slate-800 backdrop-blur-sm border-dashed" data-testid="placeholder-card">
+              <CardContent className="flex flex-col items-center justify-center h-full min-h-[400px] text-center p-8">
+                <Calculator className="w-16 h-16 text-slate-700 mb-4" />
+                <h3 className="text-lg font-semibold text-slate-400 mb-2">Aguardando Cálculo</h3>
+                <p className="text-sm text-slate-500">Preencha os dados do produto e clique em "Calcular Impacto"</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-slate-800 bg-slate-950/50 backdrop-blur-sm mt-12">
+        <div className="container mx-auto px-4 py-6 text-center">
+          <p className="text-slate-500 text-sm">
+            © 2026 SVRN Tech - Preparando empresários para a nova era tributária
+          </p>
+        </div>
+      </div>
+
+      {/* Paywall Modal */}
+      <PaywallModal isOpen={showPaywall} onClose={() => setShowPaywall(false)} />
+    </div>
+  );
+}
