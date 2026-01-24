@@ -1,35 +1,32 @@
-import { useState } from "react";
 import "@/App.css";
-import { Slider } from "@/components/ui/slider";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
-import { TrendingUp, TrendingDown, Calculator, Download, DollarSign } from "lucide-react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import AuthPage from "@/pages/AuthPage";
+import CalculatorPage from "@/pages/CalculatorPage";
 
 function App() {
-  const [productName, setProductName] = useState("");
-  const [productCost, setProductCost] = useState("");
-  const [profitMargin, setProfitMargin] = useState("");
-  const [currentTaxRate, setCurrentTaxRate] = useState("");
-  const [ivaRate, setIvaRate] = useState([26.5]);
-  const [results, setResults] = useState(null);
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<AuthPage />} />
+          <Route 
+            path="/" 
+            element={
+              <ProtectedRoute>
+                <CalculatorPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
 
-  const calculateResults = () => {
-    const cost = parseFloat(productCost);
-    const margin = parseFloat(profitMargin) / 100;
-    const currentTax = parseFloat(currentTaxRate) / 100;
-    const newTax = ivaRate[0] / 100;
-
-    if (isNaN(cost) || isNaN(margin) || isNaN(currentTax)) {
-      alert("Por favor, preencha todos os campos corretamente");
-      return;
-    }
-
-    // Preço de Venda Atual
-    const currentSalePrice = cost / (1 - margin - currentTax);
+export default App;
     
     // Lucro Atual
     const currentProfit = currentSalePrice * margin;
