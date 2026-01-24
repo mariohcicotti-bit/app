@@ -78,26 +78,38 @@ export const AuthProvider = ({ children }) => {
 
   const signUp = async (email, password) => {
     try {
+      console.log('SignUp attempt:', { email, passwordLength: password.length });
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
       });
-      if (error) throw error;
+      console.log('SignUp response:', { data, error });
+      if (error) {
+        console.error('SignUp error details:', error);
+        throw error;
+      }
       return data;
     } catch (error) {
+      console.error('SignUp catch error:', error);
       throw error;
     }
   };
 
   const signIn = async (email, password) => {
     try {
+      console.log('SignIn attempt:', { email, passwordLength: password.length });
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-      if (error) throw error;
+      console.log('SignIn response:', { data, error });
+      if (error) {
+        console.error('SignIn error details:', error);
+        throw error;
+      }
       return data;
     } catch (error) {
+      console.error('SignIn catch error:', error);
       throw error;
     }
   };
