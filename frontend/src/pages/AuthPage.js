@@ -47,7 +47,18 @@ export default function AuthPage() {
         navigate('/');
       }
     } catch (err) {
-      setError(err.message || 'Ocorreu um erro. Tente novamente.');
+      console.error('Auth error:', err);
+      
+      // Tratamento específico para rate limiting
+      if (err.message && err.message.includes('429')) {
+        setError('Muitas tentativas. Aguarde 1 minuto e tente novamente.');
+      } else if (err.message && err.message.includes('body stream')) {
+        setError('Erro de conexão. Recarregue a página e tente novamente.');
+      } else if (err.message) {
+        setError(err.message);
+      } else {
+        setError('Ocorreu um erro. Tente novamente.');
+      }
     } finally {
       setLoading(false);
     }
