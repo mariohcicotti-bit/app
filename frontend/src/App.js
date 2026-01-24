@@ -103,6 +103,7 @@ function App() {
         ['PREÇO SUGERIDO SVRN', `R$ ${results.suggestedPrice}`]
       ],
       theme: 'striped',
+      margin: { left: 20, right: 20 },
       headStyles: {
         fillColor: [0, 71, 171],
         fontSize: 12,
@@ -112,8 +113,8 @@ function App() {
         fontSize: 11
       },
       columnStyles: {
-        0: { cellWidth: 100 },
-        1: { cellWidth: 70, halign: 'right', fontStyle: 'bold' }
+        0: { cellWidth: 110 },
+        1: { cellWidth: 60, halign: 'right', fontStyle: 'bold' }
       },
       didParseCell: function(data) {
         if (data.row.index === 6 && data.section === 'body') {
