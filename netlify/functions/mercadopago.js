@@ -23,8 +23,8 @@ exports.handler = async (event) => {
           is_pro_member: true, // Nome da sua coluna de acesso
           premium_until: dataExpiracao.toISOString() // Nome da coluna que você criou agora
         })
-        .eq('email', 'mariohcicotti@gmail.com') // Libera direto para o seu e-mail de teste
-        .select();
+.eq('email', body.payer ? body.payer.email : body.user_id)
+.select();
 
       if (error) throw error;
       console.log("✅ Sucesso! Acesso liberado no Supabase.");
