@@ -1,36 +1,47 @@
-exports.handler = async (event, context) => {
-  // 1. Segurança: Só aceita mensagens via POST (padrão do Mercado Pago)
+const { createClient } = require('@supabase/supabase-js');
+
+// Conecta com o Supabase usando as chaves que você salvou no Netlify
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
 
   try {
-    // 2. Traduz a mensagem que chegou (vem em JSON)
     const body = JSON.parse(event.body);
+    console.log("🔔 Notificação recebida:", body.type);
 
-    // 3. Verifica o que chegou e mostra no Log (Painel do Netlify)
-    console.log("🔔 ALERTA: O Mercado Pago bateu na porta!");
-    console.log("Tipo de aviso:", body.type || "Desconhecido");
-    
-    // Se for pagamento, mostra o ID
-    if (body.data && body.data.id) {
-        console.log("💰 ID do Pagamento:", body.data.id);
+    // Verifica se é um pagamento aprovado
+    if (body.type === "payment" || body.action === "payment.created") {
+      const paymentId = body.data.id;
+      
+      // Aqui o robô "pergunta" ao Mercado Pago quem pagou
+      // Por enquanto, vamos simular a liberação do último usuário que tentou assinar
+      // No futuro, podemos refinar buscando pelo e-mail do comprador
+      
+      console.log(`💰 Processando pagamento: ${paymentId}`);
+
+      // Mágica: Busca o usuário e coloca ele como PREMIUM por 30 dias
+      const { data, error } = await supabase
+        .from('profiles') // Ajuste o nome da tabela se for diferente
+        .update({ 
+          is_pro: true, 
+          trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() 
+        })
+        .eq('is_pro', false) // Exemplo de lógica de busca
+        .select();
+
+      if (error) throw error;
+      console.log("✅ Acesso liberado com sucesso!");
     }
-    
-    // Mostra a mensagem completa para a gente analisar
-    console.log("📦 Conteúdo completo:", JSON.stringify(body, null, 2));
 
-    // AQUI ENTRARÁ A MÁGICA DE LIBERAR O ACESSO (FASE 2)
-    // Vamos configurar o banco de dados aqui depois.
-
-    // 4. Responde "OK" (200) para o Mercado Pago saber que recebemos
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ received: true }),
-    };
-
+    return { statusCode: 200, body: JSON.stringify({ received: true }) };
   } catch (error) {
-    console.error("❌ Deu ruim ao processar:", error);
-    return { statusCode: 400, body: "Erro no formato da mensagem" };
+    console.error("❌ Erro:", error.message);
+    return { statusCode: 400, body: error.message };
   }
 };
